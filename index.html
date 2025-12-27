@@ -2,16 +2,38 @@
 <html lang="it">
 <head>
 <meta charset="UTF-8">
-<title>Test Firebase</title>
+<title>Test Firebase DB</title>
 </head>
 <body>
 
-<h1>Test Firebase</h1>
+<h1>Test Realtime Database</h1>
 
 <script src="https://www.gstatic.com/firebasejs/10.21.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.21.0/firebase-database-compat.js"></script>
 
 <script>
   console.log('firebase:', typeof firebase);
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyByVZHzFIUcsGibzWkCuxn1nKevrvTTOc0",
+    authDomain: "capodanno-c2669.firebaseapp.com",
+    databaseURL: "https://capodanno-c2669-default-rtdb.europe-west1.firebasedatabase.app",
+    projectId: "capodanno-c2669",
+    storageBucket: "capodanno-c2669.appspot.com",
+    messagingSenderId: "656788642680",
+    appId: "1:656788642680:web:3db3d5f76679f34595468d"
+  };
+
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.database();
+
+  // TEST SCRITTURA
+  db.ref('test').set({
+    collegato: true,
+    timestamp: Date.now()
+  });
+
+  console.log('scrittura inviata');
 </script>
 
 </body>
