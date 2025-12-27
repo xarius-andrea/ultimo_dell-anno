@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Festa 31 Dicembre</title>
+
+<style>
+body{font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;margin:0;background:#f4f4f4;color:#222}
+header{background:#111;color:#fff;padding:1rem;text-align:center}
+section{padding:1rem}
+.card{background:#fff;border-radius:14px;padding:1rem;margin-bottom:1rem;box-shadow:0 2px 10px rgba(0,0,0,.08)}
+h2{margin-top:0;font-size:.95rem}
+button{background:#111;color:#fff;border:none;border-radius:10px;padding:.4rem .7rem;font-size:.85rem}
+button.remove{background:#b00020}
+button.add{margin-top:.5rem}
+table{width:100%;border-collapse:collapse}
+th,td{padding:.4rem;font-size:.85rem}
+th{background:#eee;text-align:left}
+tr:nth-child(even) td{background:#fafafa}
+input[type=text],input[type=number]{width:100%;border:none;background:transparent;font-size:.85rem}
+input:focus{outline:none;background:#e8f0fe;border-radius:6px}
+.summary{display:grid;gap:1rem}
+.summary-group{border-radius:16px;padding:1rem;background:#fafafa;box-shadow:inset 0 0 0 1px #e5e5e5}
+.summary-group h3{margin:.2rem 0 .6rem 0;font-size:.95rem;color:#444}
+.summary-group div{margin:.35rem 0;font-weight:500}
+</style>
+</head>
+
+<body>
+<header><h1>Festa 31 Dicembre 🎉</h1></header>
+
+<section class="card">
+<h2>Partecipanti</h2>
+<table id="people">
+<thead><tr><th>Nome</th><th>Pagato</th><th>Alcol</th><th></th></tr></thead>
+<tbody></tbody>
+</table>
+<button id="addPersonBtn" class="add">➕ Aggiungi partecipante</button>
+</section>
+
+<section class="card">
+<h2>Spese cibo / materiali</h2>
+<table id="items">
+<thead><tr><th>Voce</th><th>€</th><th></th></tr></thead>
+<tbody></tbody>
+</table>
+<button id="addItemBtn" class="add">➕ Aggiungi voce</button>
+</section>
+
+<section class="card">
+<h2>Spese alcolici</h2>
+<table id="alcohol">
+<thead><tr><th>Alcolico</th><th>€</th><th></th></tr></thead>
+<tbody></tbody>
+</table>
+<button id="addAlcoholBtn" class="add">➕ Aggiungi alcolico</button>
+</section>
+
+<section class="card">
+<h2>Quote</h2>
+<div class="summary">
+
+<div class="summary-group">
+<h3>Quota base</h3>
+<div>Quota stimata: € <input type="number" id="estimated" step="0.1"></div>
+</div>
+
+<div class="summary-group">
+<h3>Alcolici</h3>
+<div>Totale alcolici: € <span id="alcoholTotal">0</span></div>
+<div>Costo alcolici a persona: € <span id="alcoholPer">0</span></div>
+<div>Quota senza alcolici: € <span id="noAlcohol">0</span></div>
+</div>
+
+<div class="summary-group">
+<h3>Riepilogo</h3>
+<div>Totale quote ricevute: € <span id="received">0</span></div>
+<div>Quote totali stimate: € <span id="totalEstimated">0</span></div>
+<div>Budget rimanente: € <span id="remaining">0</span></div>
+<div>Budget rimanente stimato: € <span id="remainingEstimated">0</span></div>
+</div>
+
+</div>
+</section>
+
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/10.21.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.21.0/firebase-database-compat.js"></script>
+
+<script>
+  console.log('firebase:', typeof firebase);
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyByVZHzFIUcsGibzWkCuxn1nKevrvTTOc0",
+    authDomain: "capodanno-c2669.firebaseapp.com",
+    databaseURL: "https://capodanno-c2669-default-rtdb.europe-west1.firebasedatabase.app",
+    projectId: "capodanno-c2669",
+    storageBucket: "capodanno-c2669.appspot.com",
+    messagingSenderId: "656788642680",
+    appId: "1:656788642680:web:3db3d5f76679f34595468d"
+  };
+
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.database();
+
+let state = { estimated:10, people:[], items:[], alcohol:[] };
+
+// ---------- RENDER ----------
+function render(){
+  document.getElementById('estimated').value = state.estimated;
+
+  renderPeople();
+  renderTable('items');
+  renderTable('alcohol');
+  calc();
+}
+
+function renderPeople(){
+  const body = document.querySelector('#people tbody');
+  body.innerHTML = '';
+  state.people.forEach(p=>{
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><input value="${p.name||''}"></td>
+      <td><input type="checkbox" ${p.paid?'checked':''}></td>
+      <td><input type="checkbox" ${p.drink?'checked':''}></td>
+      <td><button class="remove">✖</button></td>
+    `;
+    tr.children[0].firstChild.oninput=e=>updatePerson(p,{name:e.target.value});
+    tr.children[1].firstChild.onchange=e=>updatePerson(p,{paid:e.target.checked});
+    tr.children[2].firstChild.onchange=e=>updatePerson(p,{drink:e.target.checked});
+    tr.children[3].firstChild.onclick=()=>removePerson(p);
+    body.appendChild(tr);
+  });
+}
+
+function renderTable(id){
+  const body = document.querySelector(`#${id} tbody`);
+  body.innerHTML='';
+  state[id].forEach(r=>{
+    const tr=document.createElement('tr');
+    tr.innerHTML=`
+      <td><input value="${r.name||''}"></td>
+      <td><input type="number" step="0.01" value="${r.price||0}"></td>
+      <td><button class="remove">✖</button></td>
+    `;
+    tr.children[0].firstChild.oninput=e=>updateItem(id,r,{name:e.target.value});
+    tr.children[1].firstChild.oninput=e=>updateItem(id,r,{price:parseFloat(e.target.value)||0});
+    tr.children[2].firstChild.onclick=()=>removeItem(id,r);
+    body.appendChild(tr);
+  });
+}
+
+// ---------- CALCOLI ----------
+function sum(arr){return arr.reduce((a,b)=>a+(b.price||0),0);}
+
+function calc(){
+  const food=sum(state.items);
+  const alcohol=sum(state.alcohol);
+  const drinkers=state.people.filter(p=>p.drink).length;
+  const nonDrinkers=state.people.length-drinkers;
+  const alcoholPer=drinkers?alcohol/drinkers:0;
+  const quotaNo=Math.max(state.estimated-alcoholPer,0);
+  const received=state.people.filter(p=>p.paid).length*state.estimated;
+  const totalEstimated=(drinkers*state.estimated)+(nonDrinkers*quotaNo);
+  const spent=food+alcohol;
+
+  alcoholTotal.textContent=alcohol.toFixed(2);
+  alcoholPer.textContent=alcoholPer.toFixed(2);
+  noAlcohol.textContent=quotaNo.toFixed(2);
+  received.textContent=received.toFixed(2);
+  totalEstimated.textContent=totalEstimated.toFixed(2);
+  remaining.textContent=(received-spent).toFixed(2);
+  remainingEstimated.textContent=(totalEstimated-spent).toFixed(2);
+}
+
+// ---------- AZIONI ----------
+function addPerson(){
+  const ref=db.ref('capodanno/people').push();
+  ref.set({name:'',paid:false,drink:true});
+}
+function updatePerson(p,data){db.ref(`capodanno/people/${p.key}`).update(data);}
+function removePerson(p){db.ref(`capodanno/people/${p.key}`).remove();}
+
+function addItem(id){
+  const ref=db.ref(`capodanno/${id}`).push();
+  ref.set({name:'',price:0});
+}
+function updateItem(id,r,data){db.ref(`capodanno/${id}/${r.key}`).update(data);}
+function removeItem(id,r){db.ref(`capodanno/${id}/${r.key}`).remove();}
+
+estimated.oninput=e=>{
+  const v=parseFloat(e.target.value);
+  if(!isNaN(v)) db.ref('capodanno/estimated').set(v);
+};
+
+addPersonBtn.onclick=addPerson;
+addItemBtn.onclick=()=>addItem('items');
+addAlcoholBtn.onclick=()=>addItem('alcohol');
+
+// ---------- SYNC ----------
+db.ref('capodanno').on('value',snap=>{
+  const d=snap.val()||{};
+  if(typeof d.estimated==='number') state.estimated=d.estimated;
+  state.people=d.people?Object.entries(d.people).map(([k,v])=>({...v,key:k})):[];
+  state.items=d.items?Object.entries(d.items).map(([k,v])=>({...v,key:k})):[];
+  state.alcohol=d.alcohol?Object.entries(d.alcohol).map(([k,v])=>({...v,key:k})):[];
+  render();
+});
+</script>
+</body>
+</html>
